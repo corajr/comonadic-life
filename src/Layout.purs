@@ -4,7 +4,9 @@ import App.Counter as Counter
 import App.NotFound as NotFound
 import App.Routes (Route(Home, NotFound))
 import Prelude (($), map)
-import Pux.Html (Html, div, h1, p, text)
+import Pux.Html (Html, div, h1, p, pre, text)
+import Data.Show (show)
+import Life
 
 data Action
   = Child (Counter.Action)
@@ -29,6 +31,8 @@ view state =
     []
     [ h1 [] [ text "Pux Starter App" ]
     , p [] [ text "Change src/Layout.purs and watch me hot-reload." ]
+    , pre [] [ text (disp glider)]
+    , pre [] [ text (disp (evolve glider))]
     , case state.route of
         Home -> map Child $ Counter.view state.count
         NotFound -> NotFound.view state

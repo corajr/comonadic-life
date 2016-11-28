@@ -1,12 +1,21 @@
 module Life where
 
+
+-- based on http://blog.emillon.org/posts/2012-10-18-comonadic-life.html
+
 import Prelude
 import Data.List.Zipper
-import Data.Maybe (Maybe(..))
+import Data.List (List)
+import Data.List as List
+import Data.String (joinWith, fromCharArray)
+import Control.Apply (lift2)
 import Control.Comonad (class Comonad, extract)
 import Control.Extend (class Extend, extend)
+import Data.Array (length, filter)
+import Data.Maybe (Maybe(..))
+import Data.Traversable (class Traversable, traverse)
 import Data.Tuple (Tuple(Tuple))
-import Data.Unfoldable  (class Unfoldable, unfoldr)
+import Data.Unfoldable (class Unfoldable, unfoldr, replicate)
 
 data Z a = Z (Zipper (Zipper a))
 
@@ -16,8 +25,12 @@ instance functorZ :: Functor Z where
 
 instance extendZ :: Extend Z where
     -- extend :: forall b a. (Z a -> b) -> Z a -> Z b
-    extend f (Z z) = ?rhs --Z <$> go f up <*> f <*> go f down
-        -- where go f d = (<$>) f <<< maybeIterate d
+    extend f = map f <<< duplicate
+        where duplicate z = Z (map horizontal (vertical z))
+              horizontal = genericMove zLeft zRight
+              vertical = genericMove zUp zDown
+              genericMove :: forall a. (Z a -> Maybe (Z a)) -> (Z a -> Maybe (Z a)) -> Z a -> Zipper (Z a)
+              genericMove a b z = Zipper (maybeIterate a z) z (maybeIterate b z)
 
 instance comonadZ :: Comonad Z where
     -- extract :: forall a. Z a -> a
@@ -36,21 +49,62 @@ downOrWrap z = case down z of
   Nothing -> beginning z
 
 -- | Move up (backward in the top-level Zipper).
-zUp :: forall a. Z a -> Z a
-zUp (Z z) = Z (upOrWrap z)
+zUp :: forall a. Z a -> Maybe (Z a)
+zUp (Z z) = Z <$> up z
 
 -- | Move down (forward in the top-level Zipper).
-zDown :: forall a. Z a -> Z a
-zDown (Z z) = Z (downOrWrap z)
+zDown :: forall a. Z a -> Maybe (Z a)
+zDown (Z z) = Z <$> down z
 
 -- | Move left (backward in all nested Zippers).
-zLeft :: forall a. Z a -> Z a
-zLeft (Z z) = Z (map upOrWrap z)
+zLeft :: forall a. Z a -> Maybe (Z a)
+zLeft (Z z) = Z <$> traverse up z
 
 -- | Move left (backward in all nested Zippers).
-zRight :: forall a. Z a -> Z a
-zRight (Z z) = Z (map downOrWrap z)
+zRight :: forall a. Z a -> Maybe (Z a)
+zRight (Z z) = Z <$> traverse down z
 
 maybeIterate :: forall a f. (Unfoldable f) => (a -> Maybe a) -> a -> f a
 maybeIterate f = unfoldr (map dup <<< f)
   where dup a = Tuple a a
+
+neighbors :: forall a. Array (Z a -> Maybe (Z a))
+neighbors = horiz <> vert <> lift2 (>=>) horiz vert
+  where horiz = [zLeft, zRight]
+        vert = [zUp, zDown]
+
+-- | Boundaries are considered dead.
+aliveNeighbors :: Z Boolean -> Int
+aliveNeighbors z = count (map fetch neighbors)
+  where count = length <<< filter id
+        fetch dir = case dir z of
+          Just z' -> extract z'
+          Nothing -> false
+
+rule :: Z Boolean -> Boolean
+rule z =
+  case aliveNeighbors z of
+    2 -> extract z
+    3 -> true
+    _ -> false
+
+evolve :: Z Boolean -> Z Boolean
+evolve = extend rule
+
+glider :: Z Boolean
+glider = Z $ Zipper (replicate 3 fz) fz rs
+  where rs = List.fromFoldable [ line [f, t, f]
+                               , line [f, f, t]
+                               , line [t, t, t] ] <> replicate 9 fz
+        t = true
+        f = false
+        fl = replicate 12 f
+        fz = Zipper fl f fl
+        line l = Zipper fl f (List.fromFoldable l)
+
+disp :: Z Boolean -> String
+disp (Z z) = joinWith "\n" (map (fromCharArray <<< map f) z')
+  where z' :: Array (Array Boolean)
+        z' = toUnfoldable (map toUnfoldable z)
+        f :: Boolean -> Char
+        f x = if x then '#' else ' '
