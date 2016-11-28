@@ -5,6 +5,7 @@ module Life where
 
 import Prelude
 import Data.List.Zipper
+import Data.List.Zipper as Zipper
 import Data.List (List)
 import Data.List as List
 import Data.String (joinWith, fromCharArray)
@@ -15,6 +16,7 @@ import Data.Array (length, filter)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (class Traversable, traverse)
 import Data.Tuple (Tuple(Tuple))
+import Data.Foldable (class Foldable)
 import Data.Unfoldable (class Unfoldable, unfoldr, replicate)
 
 data Z a = Z (Zipper (Zipper a))
@@ -35,6 +37,11 @@ instance extendZ :: Extend Z where
 instance comonadZ :: Comonad Z where
     -- extract :: forall a. Z a -> a
     extract (Z z) = extract (extract z)
+
+derive instance eqZ :: (Eq a) => Eq (Z a)
+
+instance showZ :: (Show a) => Show (Z a) where
+    show (Z z) = show z
 
 -- | Moves cursor toward beginning, or wraps back around to end.
 upOrWrap :: forall a. Zipper a -> Zipper a
@@ -98,13 +105,24 @@ glider = Z $ Zipper (replicate 3 fz) fz rs
                                , line [t, t, t] ] <> replicate 9 fz
         t = true
         f = false
-        fl = replicate 12 f
+        fl = replicate 6 f
         fz = Zipper fl f fl
-        line l = Zipper fl f (List.fromFoldable l)
+        line l = Zipper (replicate 2 f) f (List.fromFoldable l <> fl)
+
 
 disp :: Z Boolean -> String
 disp (Z z) = joinWith "\n" (map (fromCharArray <<< map f) z')
   where z' :: Array (Array Boolean)
-        z' = toUnfoldable (map toUnfoldable z)
+        z' = toUnfoldable (Z z)
         f :: Boolean -> Char
         f x = if x then '#' else ' '
+
+toUnfoldable :: forall a f. (Unfoldable f) => Z a -> f (f a)
+toUnfoldable (Z z) = Zipper.toUnfoldable (map Zipper.toUnfoldable z)
+
+
+fromList :: forall a. List (List a) -> Maybe (Z a)
+fromList x = Z <$> (traverse Zipper.fromFoldable x >>= Zipper.fromFoldable)
+
+fromFoldable :: forall a f. (Foldable f) => f (f a) -> Maybe (Z a)
+fromFoldable x = fromList (map List.fromFoldable (List.fromFoldable x))

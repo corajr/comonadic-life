@@ -33,6 +33,7 @@ view state =
     , p [] [ text "Change src/Layout.purs and watch me hot-reload." ]
     , pre [] [ text (disp glider)]
     , pre [] [ text (disp (evolve glider))]
+    , pre [] [ text (disp (evolve (evolve glider)))]
     , case state.route of
         Home -> map Child $ Counter.view state.count
         NotFound -> NotFound.view state
