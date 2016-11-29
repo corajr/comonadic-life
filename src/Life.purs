@@ -16,7 +16,7 @@ import Data.Bounded (class Bounded, bottom)
 import Data.Foldable (class Foldable)
 import Data.Generic (class Generic, gShow)
 import Data.List (List(..), reverse)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe')
 import Data.Newtype (class Newtype, wrap, unwrap)
 import Data.String (joinWith, fromCharArray)
 import Data.Traversable (class Traversable, traverse)
@@ -39,11 +39,15 @@ derive instance genericArrayZipper :: (Generic a) => Generic (ArrayZipper a)
 instance showArrayZipper :: (Show a) => Show (ArrayZipper a) where
   show (ArrayZipper { array, index }) = show array
 
-getOrDie = fromMaybe (unsafeCrashWith "Out of bounds!")
+getOrDie array index = fromMaybe' (\_ -> unsafeCrashWith msg) (array !! index)
+  where msg = "Tried to access element " <> show index <> " of " <> show (length array)
+
+wrapI index i array = (n + index + i) `mod` n
+  where n = length array
 
 instance indexableArrayZipper :: Indexable ArrayZipper Int where
-  getIndex (ArrayZipper {array, index}) i = getOrDie (array !! index')
-    where index' = (index + 1) `mod` length array
+  getIndex (ArrayZipper {array, index}) i = getOrDie array index'
+    where index' = wrapI index i array
 
 instance functorArrayZipper :: Functor ArrayZipper where
     -- map :: forall a b. (a -> b) -> ArrayZipper a -> ArrayZipper b
@@ -60,7 +64,7 @@ instance comonadZ :: Comonad ArrayZipper where
 
 shift :: forall a. Int -> ArrayZipper a -> ArrayZipper a
 shift i (ArrayZipper z@{ array, index }) = ArrayZipper (z { index = index' })
-    where index' = (index + 1) `mod` length array
+    where index' = wrapI index i array
 
 newtype ArrayZipperT w a = ArrayZipperT (w (ArrayZipper a))
 
@@ -132,7 +136,6 @@ glider = rs
         f = false
         fs = replicate 6 f
         fl = replicate 15 f
-
 
 disp :: Z Boolean -> String
 disp z = joinWith "\n" (map (fromCharArray <<< map f) z')
