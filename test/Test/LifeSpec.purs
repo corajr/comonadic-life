@@ -89,7 +89,7 @@ spec = do
       Just (extend id planeZ) `shouldEqual` metaPlaneZ'
     it "should return the original plane when combined with extract" do
       extend extract planeZ `shouldEqual` planeZ
-  -- comonadLaws
+  comonadLaws
   let sampleArray = [[false, true, false], [false, false, false], [false, false, false]]
       sampleArray' = [[1, 0, 1], [1, 1, 1], [0, 0, 0]]
       sampleBoard = fromMaybe emptyZ (Life.fromFoldable sampleArray)

@@ -14,6 +14,7 @@ import Control.Comonad (class Comonad, extract)
 import Control.Extend (class Extend, extend)
 import Data.Bounded (class Bounded, bottom)
 import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary, class Coarbitrary, coarbitrary)
+import Test.QuickCheck.Gen
 import Data.Array (length, filter)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (class Traversable, traverse)
@@ -47,8 +48,9 @@ instance showZ :: (Show a) => Show (Z a) where
 
 instance arbitraryZ :: (Arbitrary a, Bounded a) => Arbitrary (Z a) where
   arbitrary = do
-    xs <- arbitrary
-    pure (fromMaybe emptyZ (fromList xs))
+    n <- chooseInt 0 3
+    xs <- vectorOf n (vectorOf n (elements bottom [bottom, top]))
+    pure (fromMaybe emptyZ (fromFoldable xs))
 
 instance coarbitraryZ :: (Coarbitrary a) => Coarbitrary (Z a) where
   coarbitrary xs = coarbitrary xs'
