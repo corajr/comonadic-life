@@ -6,14 +6,16 @@ module Life where
 import Prelude
 import Data.List.Zipper
 import Data.List.Zipper as Zipper
-import Data.List (List)
+import Data.List (List(..))
 import Data.List as List
 import Data.String (joinWith, fromCharArray)
 import Control.Apply (lift2)
 import Control.Comonad (class Comonad, extract)
 import Control.Extend (class Extend, extend)
+import Data.Bounded (class Bounded, bottom)
+import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary, class Coarbitrary, coarbitrary)
 import Data.Array (length, filter)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (class Traversable, traverse)
 import Data.Tuple (Tuple(Tuple))
 import Data.Foldable (class Foldable)
@@ -42,6 +44,16 @@ derive instance eqZ :: (Eq a) => Eq (Z a)
 
 instance showZ :: (Show a) => Show (Z a) where
     show (Z z) = show z
+
+instance arbitraryZ :: (Arbitrary a, Bounded a) => Arbitrary (Z a) where
+  arbitrary = do
+    xs <- arbitrary
+    pure (fromMaybe emptyZ (fromList xs))
+
+instance coarbitraryZ :: (Coarbitrary a) => Coarbitrary (Z a) where
+  coarbitrary xs = coarbitrary xs'
+    where xs' :: Array (Array a)
+          xs' = toUnfoldable xs
 
 -- | Moves cursor toward beginning, or wraps back around to end.
 upOrWrap :: forall a. Zipper a -> Zipper a
@@ -80,6 +92,9 @@ neighbors = horiz <> vert <> lift2 (>=>) horiz vert
   where horiz = [zLeft, zRight]
         vert = [zUp, zDown]
 
+emptyZ :: forall a. (Bounded a) => Z a
+emptyZ = Z (Zipper Nil (Zipper Nil bottom Nil) Nil)
+
 -- | Boundaries are considered dead.
 aliveNeighbors :: Z Boolean -> Int
 aliveNeighbors z = count (map fetch neighbors)
@@ -99,15 +114,15 @@ evolve :: Z Boolean -> Z Boolean
 evolve = extend rule
 
 glider :: Z Boolean
-glider = Z $ Zipper (replicate 3 fz) fz rs
-  where rs = List.fromFoldable [ line [f, t, f]
-                               , line [f, f, t]
-                               , line [t, t, t] ] <> replicate 9 fz
+glider = fromMaybe emptyZ rs
+  where rs = fromFoldable ([ [f, t, f] <> fs
+                           , [f, f, t] <> fs
+                           , [t, t, t] <> fs
+                           ] <> replicate 3 fl)
         t = true
         f = false
-        fl = replicate 6 f
-        fz = Zipper fl f fl
-        line l = Zipper (replicate 2 f) f (List.fromFoldable l <> fl)
+        fs = replicate 9 f
+        fl = replicate 12 f
 
 
 disp :: Z Boolean -> String
@@ -119,7 +134,6 @@ disp (Z z) = joinWith "\n" (map (fromCharArray <<< map f) z')
 
 toUnfoldable :: forall a f. (Unfoldable f) => Z a -> f (f a)
 toUnfoldable (Z z) = Zipper.toUnfoldable (map Zipper.toUnfoldable z)
-
 
 fromList :: forall a. List (List a) -> Maybe (Z a)
 fromList x = Z <$> (traverse Zipper.fromFoldable x >>= Zipper.fromFoldable)

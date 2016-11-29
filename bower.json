@@ -10,10 +10,12 @@
   "dependencies": {
     "purescript-pux": "^7.0.0",
     "purescript-pux-devtool": "^4.1.0",
-    "purescript-list-zipper": "git://github.com/soupi/purescript-list-zipper.git#d4f3730"
+    "purescript-list-zipper": "git://github.com/soupi/purescript-list-zipper.git#d4f3730",
+    "purescript-quickcheck": "^3.1.1"
   },
   "devDependencies": {
     "purescript-spec": "^0.10.0",
-    "purescript-spec-discovery": "^0.2.0"
+    "purescript-spec-discovery": "^0.2.0",
+    "purescript-spec-quickcheck": "git://github.com/owickstrom/purescript-spec-quickcheck.git#db4ff37167c3ccbf3bc5ed6a8b84a3745cc46588"
   }
 }

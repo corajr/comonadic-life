@@ -1,16 +1,21 @@
 module Test.LifeSpec where
 
 import Prelude
-import Test.Spec (Spec, describe, it)
-import Test.Spec.Assertions (shouldEqual)
 import Life
-import Life as Life
-import Data.Maybe (Maybe(..))
-import Data.List (List(..))
-import Data.List as List
 import Data.List.Zipper
+import Data.List as List
+import Life as Life
+import Control.Comonad (class Comonad, extract)
+import Control.Extend (class Extend, extend)
+import Data.List (List(..))
+import Data.Maybe (Maybe(..), fromMaybe)
+import Test.QuickCheck (class Coarbitrary, (===))
+import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary, class Coarbitrary, coarbitrary)
+import Test.Spec (Spec, describe, it, pending)
+import Test.Spec.Assertions (shouldEqual)
+import Test.Spec.QuickCheck (quickCheck)
 
-spec :: forall r. Spec r Unit
+-- spec :: forall r. Spec r Unit
 spec = do
   let z = Zipper Nil 1 (List.fromFoldable [2, 3])
       z' = Zipper (List.fromFoldable [1]) 2 (List.fromFoldable [3])
@@ -56,4 +61,12 @@ spec = do
     it "moves the cursor left one" do
       zLeft planeZr `shouldEqual` Just planeZ
       zLeft planeZr' `shouldEqual` Just planeZ'
-
+  describe "Z Comonad laws" do
+    it "extend extract = id" $
+      quickCheck \(xs :: Z Boolean) -> extend extract xs === xs
+    it "extract <<< extend f = f" $
+      quickCheck \(xs :: Z Boolean) (f :: Z Boolean -> Boolean) -> extract (extend f xs) === f xs
+    it "extend f <<< extend g = extend (f <<< extend g)" $
+      quickCheck \(xs :: Z Boolean) (f :: Z Boolean -> Boolean) (g :: Z Boolean -> Boolean) -> extend f (extend g xs) === extend (f <<< extend g) xs
+  describe "aliveNeighbors" do
+    pending "returns the number of alive neighbors"
