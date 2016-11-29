@@ -97,9 +97,8 @@ emptyZ = Z (Zipper Nil (Zipper Nil bottom Nil) Nil)
 
 -- | Boundaries are considered dead.
 aliveNeighbors :: Z Boolean -> Int
-aliveNeighbors z = count (map fetch neighbors)
-  where count = length <<< filter id
-        fetch dir = case dir z of
+aliveNeighbors z = length <<< filter id $ map fetch neighbors
+  where fetch dir = case dir z of
           Just z' -> extract z'
           Nothing -> false
 
@@ -115,14 +114,15 @@ evolve = extend rule
 
 glider :: Z Boolean
 glider = fromMaybe emptyZ rs
-  where rs = fromFoldable ([ [f, t, f] <> fs
-                           , [f, f, t] <> fs
-                           , [t, t, t] <> fs
-                           ] <> replicate 3 fl)
+  where rs = fromFoldable ( replicate 3 fl <>
+                            [ fs <> [f, t, f] <> fs
+                            , fs <> [f, f, t] <> fs
+                            , fs <> [t, t, t] <> fs
+                            ] <> replicate 3 fl)
         t = true
         f = false
-        fs = replicate 9 f
-        fl = replicate 12 f
+        fs = replicate 6 f
+        fl = replicate 15 f
 
 
 disp :: Z Boolean -> String

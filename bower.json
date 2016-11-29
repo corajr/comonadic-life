@@ -16,6 +16,7 @@
   "devDependencies": {
     "purescript-spec": "^0.10.0",
     "purescript-spec-discovery": "^0.2.0",
-    "purescript-spec-quickcheck": "git://github.com/owickstrom/purescript-spec-quickcheck.git#db4ff37167c3ccbf3bc5ed6a8b84a3745cc46588"
+    "purescript-spec-quickcheck": "git://github.com/owickstrom/purescript-spec-quickcheck.git#db4ff37167c3ccbf3bc5ed6a8b84a3745cc46588",
+    "purescript-jack": "git://github.com/corajr/purescript-jack.git#174811c"
   }
 }

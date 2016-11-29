@@ -8,6 +8,14 @@ import Node.Process (PROCESS)
 import Test.Spec.Discovery (discover)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.Runner (run)
+import Jack.Runner (jackMain)
 
-main :: Eff (fs :: FS, process :: PROCESS, console :: CONSOLE) Unit
-main = discover "Test\\..*Spec" >>= run [consoleReporter]
+-- main :: Eff (fs :: FS, process :: PROCESS, console :: CONSOLE) Unit
+main = do
+  jackMain [
+    "Test.LifeComonadLaws"
+  ]
+  discover "Test\\..*Spec" >>= run [consoleReporter]
+
+
+
