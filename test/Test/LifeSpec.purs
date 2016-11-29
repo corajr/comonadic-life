@@ -7,7 +7,7 @@ import Data.List as List
 import Life as Life
 import Control.Comonad (extract)
 import Control.Extend (extend)
-import Data.Array (length)
+import Data.Array (length, replicate)
 import Data.List (List(..))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Test.QuickCheck ((===))
@@ -54,7 +54,7 @@ spec = do
       planeZr' = Z (Zipper (List.singleton z1') z2' Nil)
       zArray = [[1,2], [3,4]]
       metaPlaneZ = [[planeZ, planeZr], [planeZ', planeZr']]
-      metaPlaneZ' = Life.fromFoldable metaPlaneZ
+      metaPlaneZ' = fromMaybe emptyZ (Life.fromFoldable metaPlaneZ)
   describe "fromFoldable" do
     it "converts a Foldable into a Z" do
       Life.fromFoldable zArray `shouldEqual` Just planeZ
@@ -86,12 +86,22 @@ spec = do
       maybeIterate (\x -> if x >= 8 then Nothing else Just (x*2)) 1 `shouldEqual` [2,4,8]
   describe "extend" do
     it "should turn a Z a into a Z (Z a)" do
-      Just (extend id planeZ) `shouldEqual` metaPlaneZ'
+      extend id planeZ `shouldEqual` metaPlaneZ'
+    let get = fromMaybe emptyZ
+        arrayZ3 = replicate 3 (replicate 3 0)
+        planeZ3 = get (Life.fromFoldable arrayZ3)
+        metaArrayZ3 = [ [planeZ3, get (zRight planeZ3), get (zRight planeZ3 >>= zRight)]
+                      , [get (zDown planeZ3), get (zDown planeZ3 >>= zRight), get (zDown planeZ3 >>= zRight >>= zRight)]
+                      , [get (zDown planeZ3 >>= zDown), get (zDown planeZ3 >>= zDown >>= zRight), get (zDown planeZ3 >>= zDown >>= zRight >>= zRight)]
+                      ]
+        metaPlaneZ3 = Life.fromFoldable metaArrayZ3
+    it "should turn a 3x3 Z a into a Z (Z a)" do
+      Just (extend id planeZ3) `shouldEqual` metaPlaneZ3
     it "should return the original plane when combined with extract" do
       extend extract planeZ `shouldEqual` planeZ
   comonadLaws
-  let sampleArray = [[false, true, false], [false, false, false], [false, false, false]]
-      sampleArray' = [[1, 0, 1], [1, 1, 1], [0, 0, 0]]
+  let sampleArray = [[false, false, false], [false, true, false], [false, false, false]]
+      sampleArray' = [[1, 1, 1], [1, 0, 1], [1, 1, 1]]
       sampleBoard = fromMaybe emptyZ (Life.fromFoldable sampleArray)
       sampleBoard' = fromMaybe emptyZ (Life.fromFoldable sampleArray')
   describe "neighbors" do

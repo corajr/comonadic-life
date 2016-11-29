@@ -5,22 +5,22 @@ module Life where
 
 import Prelude
 import Data.List.Zipper
-import Data.List.Zipper as Zipper
-import Data.List (List(..))
+import Test.QuickCheck.Gen
 import Data.List as List
-import Data.String (joinWith, fromCharArray)
+import Data.List.Zipper as Zipper
 import Control.Apply (lift2)
 import Control.Comonad (class Comonad, extract)
 import Control.Extend (class Extend, extend)
+import Data.Array (filter, length)
 import Data.Bounded (class Bounded, bottom)
-import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary, class Coarbitrary, coarbitrary)
-import Test.QuickCheck.Gen
-import Data.Array (length, filter)
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Traversable (class Traversable, traverse)
-import Data.Tuple (Tuple(Tuple))
 import Data.Foldable (class Foldable)
+import Data.List (List(..), reverse)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.String (joinWith, fromCharArray)
+import Data.Traversable (class Traversable, traverse, sequence)
+import Data.Tuple (Tuple(Tuple))
 import Data.Unfoldable (class Unfoldable, unfoldr, replicate)
+import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary, class Coarbitrary, coarbitrary)
 
 data Z a = Z (Zipper (Zipper a))
 
@@ -35,13 +35,25 @@ instance extendZ :: Extend Z where
               horizontal = genericMove zLeft zRight
               vertical = genericMove zUp zDown
               genericMove :: forall a. (Z a -> Maybe (Z a)) -> (Z a -> Maybe (Z a)) -> Z a -> Zipper (Z a)
-              genericMove a b z = Zipper (maybeIterate a z) z (maybeIterate b z)
+              genericMove a b z = Zipper (reverse (maybeIterate a z)) z (maybeIterate b z)
 
 instance comonadZ :: Comonad Z where
     -- extract :: forall a. Z a -> a
     extract (Z z) = extract (extract z)
 
 derive instance eqZ :: (Eq a) => Eq (Z a)
+
+-- this instance is invalid and exists only to support boundedZ
+instance ordZ :: (Ord a) => Ord (Z a) where
+  compare y z = compare y' z'
+    where y' :: Array (Array a)
+          y' = toUnfoldable y
+          z' :: Array (Array a)
+          z' = toUnfoldable z
+
+instance boundedZ :: (Bounded a) => Bounded (Z a) where
+  bottom = Z (Zipper Nil (Zipper Nil bottom Nil) Nil)
+  top =  Z (Zipper Nil (Zipper Nil top Nil) Nil)
 
 instance showZ :: (Show a) => Show (Z a) where
     show (Z z) = show z
@@ -79,11 +91,13 @@ zDown (Z z) = Z <$> down z
 
 -- | Move left (backward in all nested Zippers).
 zLeft :: forall a. Z a -> Maybe (Z a)
-zLeft (Z z) = Z <$> traverse up z
+zLeft (Z z) = Z <$> sequence xs
+  where xs = map up z
 
 -- | Move left (backward in all nested Zippers).
 zRight :: forall a. Z a -> Maybe (Z a)
-zRight (Z z) = Z <$> traverse down z
+zRight (Z z) = Z <$> sequence xs
+  where xs = map down z
 
 maybeIterate :: forall a f. (Unfoldable f) => (a -> Maybe a) -> a -> f a
 maybeIterate f = unfoldr (map dup <<< f)
