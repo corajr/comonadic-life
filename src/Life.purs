@@ -35,7 +35,7 @@ instance extendZ :: Extend Z where
               horizontal = genericMove zLeft zRight
               vertical = genericMove zUp zDown
               genericMove :: forall a. (Z a -> Maybe (Z a)) -> (Z a -> Maybe (Z a)) -> Z a -> Zipper (Z a)
-              genericMove a b z = Zipper (reverse (maybeIterate a z)) z (maybeIterate b z)
+              genericMove a b z = Zipper (maybeIterate a z) z (maybeIterate b z)
 
 instance comonadZ :: Comonad Z where
     -- extract :: forall a. Z a -> a
@@ -61,7 +61,7 @@ instance showZ :: (Show a) => Show (Z a) where
 instance arbitraryZ :: (Arbitrary a, Bounded a) => Arbitrary (Z a) where
   arbitrary = do
     n <- chooseInt 0 3
-    xs <- vectorOf n (vectorOf n (elements bottom [bottom, top]))
+    xs <- vectorOf n (vectorOf n arbitrary)
     pure (fromMaybe emptyZ (fromFoldable xs))
 
 instance coarbitraryZ :: (Coarbitrary a) => Coarbitrary (Z a) where

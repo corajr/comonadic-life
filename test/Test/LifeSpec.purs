@@ -18,11 +18,11 @@ import Test.Spec.QuickCheck (quickCheck)
 comonadLaws = do
   describe "Z Comonad laws" do
     it "extend extract = id" $
-      quickCheck \(xs :: Z Boolean) -> extend extract xs === xs
+      quickCheck \(xs :: Z Int) -> extend extract xs === xs
     it "extract <<< extend f = f" $
-      quickCheck \(xs :: Z Boolean) (f :: Z Boolean -> Boolean) -> extract (extend f xs) === f xs
+      quickCheck \(xs :: Z Int) (f :: Z Int -> Int) -> extract (extend f xs) === f xs
     it "extend f <<< extend g = extend (f <<< extend g)" $
-      quickCheck \(xs :: Z Boolean) (f :: Z Boolean -> Boolean) (g :: Z Boolean -> Boolean) -> extend f (extend g xs) === extend (f <<< extend g) xs
+      quickCheck \(xs :: Z Int) (f :: Z Int -> Boolean) (g :: Z Int -> Int) -> extend f (extend g xs) === extend (f <<< extend g) xs
 
 checkInverse a b =
   quickCheck \(xs :: Z Boolean) -> (case a xs of
@@ -55,6 +55,9 @@ spec = do
       zArray = [[1,2], [3,4]]
       metaPlaneZ = [[planeZ, planeZr], [planeZ', planeZr']]
       metaPlaneZ' = fromMaybe emptyZ (Life.fromFoldable metaPlaneZ)
+  describe "fromList" do
+    it "inverse of toUnfoldable" $
+      quickCheck \(xs :: Z Int) -> fromList (Life.toUnfoldable xs) === Just xs
   describe "fromFoldable" do
     it "converts a Foldable into a Z" do
       Life.fromFoldable zArray `shouldEqual` Just planeZ
