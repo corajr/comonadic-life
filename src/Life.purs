@@ -17,7 +17,7 @@ import Data.Foldable (class Foldable)
 import Data.List (List(..), reverse)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith, fromCharArray)
-import Data.Traversable (class Traversable, traverse, sequence)
+import Data.Traversable (class Traversable, traverse)
 import Data.Tuple (Tuple(Tuple))
 import Data.Unfoldable (class Unfoldable, unfoldr, replicate)
 import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary, class Coarbitrary, coarbitrary)
@@ -91,13 +91,11 @@ zDown (Z z) = Z <$> down z
 
 -- | Move left (backward in all nested Zippers).
 zLeft :: forall a. Z a -> Maybe (Z a)
-zLeft (Z z) = Z <$> sequence xs
-  where xs = map up z
+zLeft (Z z) = Z <$> traverse up z
 
 -- | Move left (backward in all nested Zippers).
 zRight :: forall a. Z a -> Maybe (Z a)
-zRight (Z z) = Z <$> sequence xs
-  where xs = map down z
+zRight (Z z) = Z <$> traverse down z
 
 maybeIterate :: forall a f. (Unfoldable f) => (a -> Maybe a) -> a -> f a
 maybeIterate f = unfoldr (map dup <<< f)
