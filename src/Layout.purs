@@ -1,6 +1,6 @@
 module App.Layout where
 
-import App.Counter as Counter
+import App.LifeDisplay as LifeDisplay
 import App.NotFound as NotFound
 import App.Routes (Route(Home, NotFound))
 import Prelude (($), map)
@@ -9,21 +9,21 @@ import Data.Show (show)
 import Life
 
 data Action
-  = Child (Counter.Action)
+  = Child (LifeDisplay.Action)
   | PageView Route
 
 type State =
   { route :: Route
-  , count :: Counter.State }
+  , count :: LifeDisplay.State }
 
 init :: State
 init =
   { route: NotFound
-  , count: Counter.init }
+  , count: LifeDisplay.init }
 
 update :: Action -> State -> State
 update (PageView route) state = state { route = route }
-update (Child action) state = state { count = Counter.update action state.count }
+update (Child action) state = state { count = LifeDisplay.update action state.count }
 
 view :: State -> Html Action
 view state =
@@ -31,11 +31,7 @@ view state =
     []
     [ h1 [] [ text "Pux Starter App" ]
     , p [] [ text "Change src/Layout.purs and watch me hot-reload." ]
-    , pre [] [ text (disp glider)]
-    , pre [] [ text (disp (evolve glider))]
-    , pre [] [ text (disp (evolve (evolve glider)))]
-    , pre [] [ text (disp (evolve (evolve (evolve glider))))]
     , case state.route of
-        Home -> map Child $ Counter.view state.count
+        Home -> map Child $ LifeDisplay.view state.count
         NotFound -> NotFound.view state
     ]

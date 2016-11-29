@@ -1,25 +1,19 @@
-# pux-starter-app
+# comonadic-life
 
-Starter [Pux](https://github.com/alexmingoia/purescript-pux/) application using
-webpack with hot-reloading and time-travel debug using
-[pux-devtool](https://github.com/alexmingoia/pux-devtool).
+Implementation of Conway's Game of Life using a comonad transformer.
 
-See the [Guide](https://alexmingoia.github.io/purescript-pux) for help learning
-Pux.
-
-![Pux starter app animation](support/pux-starter-app.gif)
+A simple port of https://github.com/gelisam/conway/blob/master/src/Conway.hs
 
 ## Installation
 
 ```sh
-git clone git://github.com/alexmingoia/pux-starter-app.git example
+git clone git://github.com/corajr/comonadic-life
 cd example
 npm install
 npm start
 ```
 
-Visit `http://localhost:3000` in your browser, edit `src/purs/Layout.purs`
-and watch the magic!
+Visit `http://localhost:3000` in your browser and click Step to evolve.
 
 ## Available scripts
 
