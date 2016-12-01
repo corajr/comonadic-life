@@ -27,11 +27,12 @@ instance showZZ :: (Show a) => Show (ZZ a) where
           z' = toUnfoldable z
 
 instance functorZZ :: Functor ZZ where
-    map f (ZZ z) = ZZ (map ((map <<< map) f) z)
+    map f (ZZ z) = ZZ (map (map (map f)) z)
 
 instance extendZZ :: Extend ZZ where
-  extend f (ZZ w) = ZZ (extend (extend (extend f')) w)
+  extend f (ZZ zz) = ZZ (extend (map (extend f' <<< rotations)) zz)
     where f' = f <<< ZZ
+  -- extend f (ZZ w) = ZZ (map (f <<< ZZ) (rotations (rotations (rotations w))))
 
 instance comonadZZ :: Comonad ZZ where
     extract (ZZ z) = extract (extract (extract z))
