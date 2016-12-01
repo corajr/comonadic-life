@@ -2,114 +2,160 @@ module Test.LifeSpec where
 
 import Prelude
 import Life
-import Data.List.Zipper
-import Data.List as List
 import Life as Life
-import Control.Comonad (extract)
-import Control.Extend (extend)
-import Data.Array (length, replicate)
+import Control.Comonad (class Comonad, extract)
+import Control.Extend (class Extend, extend)
+import Control.Monad.Eff.Class (liftEff)
+import Data.Array (length, replicate, toUnfoldable)
+import Data.Identity (Identity(..))
+import Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmptyList)
+import Data.List as List
 import Data.List (List(..))
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Newtype (class Newtype, wrap, unwrap)
+import Data.NonEmpty ((:|))
 import Test.QuickCheck ((===))
+import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary, class Coarbitrary, coarbitrary)
+import Test.QuickCheck.Gen (chooseInt, listOf, vectorOf)
+import Test.QuickCheck.Laws.Data.Functor (checkFunctor)
+import Test.QuickCheck.Laws.Data.Eq (checkEq)
+import Test.QuickCheck.Laws.Data.Ord (checkOrd)
+import Test.QuickCheck.Laws.Control.Comonad (checkComonad)
+import Test.QuickCheck.Laws.Control.Extend (checkExtend)
+import Test.QuickCheck.Laws (A)
 import Test.Spec (Spec, describe, it, pending)
 import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.QuickCheck (quickCheck)
+import Type.Proxy (Proxy(..), Proxy2(..))
 
-comonadLaws = do
-  describe "Z Comonad laws" do
-    it "extend extract = id" $
-      quickCheck \(xs :: Z Int) -> extend extract xs === xs
-    it "extract <<< extend f = f" $
-      quickCheck \(xs :: Z Int) (f :: Z Int -> Int) -> extract (extend f xs) === f xs
-    it "extend f <<< extend g = extend (f <<< extend g)" $
-      quickCheck \(xs :: Z Int) (f :: Z Int -> Boolean) (g :: Z Int -> Int) -> extend f (extend g xs) === extend (f <<< extend g) xs
+newtype ArbZipperT a = ArbZipperT (ZipperT Identity a)
 
-checkInverse a b =
-  quickCheck \(xs :: Z Boolean) -> (case a xs of
-                                       Just xs' -> b xs' === Just xs
-                                       Nothing -> xs === xs)
+derive instance newtypeArbZipperT :: Newtype (ArbZipperT a) _
+
+instance arbArbZipperT :: (Arbitrary a) => Arbitrary (ArbZipperT a) where
+  arbitrary = do
+    (NEL xs) <- arbitrary
+    pure (ArbZipperT (wrap (wrap xs)))
+
+instance coarbArbZipperT :: (Coarbitrary a) => Coarbitrary (ArbZipperT a) where
+  coarbitrary (ArbZipperT (ZipperT (Identity xs))) = coarbitrary (NE.head xs) >>> coarbitrary xs'
+    where xs' :: Array a
+          xs' = NE.toUnfoldable xs
+
+instance showArbZipperT :: (Show a) => Show (ArbZipperT a) where
+  show (ArbZipperT z) = show z
+
+derive instance eqArbZipperT :: (Eq a) => Eq (ArbZipperT a)
+derive instance ordArbZipperT :: (Ord a) => Ord (ArbZipperT a)
+
+instance functorArbZipperT :: Functor ArbZipperT where
+  map f (ArbZipperT z) = ArbZipperT (map f z)
+
+instance extendArbZipperT :: Extend ArbZipperT where
+  extend f (ArbZipperT z) = ArbZipperT (extend (f <<< ArbZipperT) z)
+
+instance comonadArbZipperT :: Comonad ArbZipperT where
+  extract (ArbZipperT z) = extract z
+
+newtype ArbZ a = ArbZ (Z a)
+
+derive instance newtypeArbZ :: Newtype (ArbZ a) _
+
+instance arbArbZ :: (Arbitrary a) => Arbitrary (ArbZ a) where
+  arbitrary = do
+    n <- chooseInt 1 3
+    xs <- vectorOf n (vectorOf n arbitrary)
+    case fromFoldable xs of
+      Just xs' -> pure $ ArbZ xs'
+      Nothing -> arbitrary
+
+instance coarbArbZ :: (Coarbitrary a) => Coarbitrary (ArbZ a) where
+  coarbitrary (ArbZ a) = coarbitrary x >>> coarbitrary xs
+    where x = extract a
+          xs :: Array (Array a)
+          xs = Life.toUnfoldable a
+
+instance showArbZ :: (Show a) => Show (ArbZ a) where
+  show (ArbZ z) = show z
+
+derive newtype instance eqArbZ :: (Eq a) => Eq (ArbZ a)
+derive newtype instance ordArbZ :: (Ord a) => Ord (ArbZ a)
+
+instance functorArbZ :: Functor ArbZ where
+  map f (ArbZ z) = ArbZ (map f z)
+
+instance extendArbZ :: Extend ArbZ where
+  extend f (ArbZ z) = ArbZ (extend (f <<< ArbZ) z)
+
+instance comonadArbZ :: Comonad ArbZ where
+  extract (ArbZ z) = extract z
+
+prxArbZipperT = Proxy :: Proxy (ArbZipperT A)
+prxArbZ = Proxy :: Proxy (ArbZ A)
+
+prx2arbZipperT = Proxy2 :: Proxy2 ArbZipperT
+prx2arbZ = Proxy2 :: Proxy2 ArbZ
+
+newtype NEL a = NEL (NonEmptyList a)
+
+instance arbitraryNEL :: Arbitrary a => Arbitrary (NEL a) where
+  arbitrary = do
+    x <- arbitrary
+    n <- chooseInt 0 5
+    xs <- listOf n arbitrary
+    pure (NEL (wrap (x :| xs)))
+
+checkInverts a b =
+  quickCheck \(NEL (xs :: NonEmptyList Int)) ->
+    (b (a xs)) === xs
 
 -- spec :: forall r. Spec r Unit
 spec = do
-  let z = Zipper Nil 1 (List.fromFoldable [2, 3])
-      z' = Zipper (List.fromFoldable [1]) 2 (List.fromFoldable [3])
-      z'' = Zipper (List.fromFoldable [2, 1]) 3 Nil
-  describe "upOrWrap" do
-    it "moves a zipper up or wraps to end" $ do
-      upOrWrap z `shouldEqual` z''
-      upOrWrap z' `shouldEqual` z
-      upOrWrap z'' `shouldEqual` z'
-  describe "downOrWrap" do
-    it "moves a zipper down or wraps to beginning" $ do
-      downOrWrap z `shouldEqual` z'
-      downOrWrap z' `shouldEqual` z''
-      downOrWrap z'' `shouldEqual` z
-  let z1 = Zipper Nil 1 (List.singleton 2)
-      z2 = Zipper Nil 3 (List.singleton 4)
-      z1' = Zipper (List.singleton 1) 2 Nil
-      z2' = Zipper (List.singleton 3) 4 Nil
-      planeZ = Z (Zipper Nil z1 (List.singleton z2))
-      planeZ' = Z (Zipper (List.singleton z1) z2 Nil)
-      planeZr = Z (Zipper Nil z1' (List.singleton z2'))
-      planeZr' = Z (Zipper (List.singleton z1') z2' Nil)
-      zArray = [[1,2], [3,4]]
-      metaPlaneZ = [[planeZ, planeZr], [planeZ', planeZr']]
-      metaPlaneZ' = fromMaybe emptyZ (Life.fromFoldable metaPlaneZ)
-  describe "fromList" do
-    it "inverse of toUnfoldable" $
-      quickCheck \(xs :: Z Int) -> fromList (Life.toUnfoldable xs) === Just xs
+  let nel1 = NE.singleton 1
+      nel = wrap (1 :| Cons 2 (Cons 3 Nil))
+  describe "up" do
+    it "moves the list up" do
+      up nel1 `shouldEqual` nel1
+      NE.toUnfoldable (up nel) `shouldEqual` [2,3,1]
+    it "inverts down" $ checkInverts down up
+    it "leaves length the same" $
+      quickCheck \(NEL xs :: NEL Int) -> NE.length (up xs) === NE.length xs
+  describe "down" do
+    it "moves the list down" do
+      down nel1 `shouldEqual` nel1
+      NE.toUnfoldable (down nel) `shouldEqual` [3,1,2]
+    it "inverts up" $ checkInverts up down
+    it "leaves length the same" $
+      quickCheck \(NEL xs :: NEL Int) -> NE.length (down xs) === NE.length xs
   describe "fromFoldable" do
-    it "converts a Foldable into a Z" do
-      Life.fromFoldable zArray `shouldEqual` Just planeZ
-  describe "toUnfoldable" do
-    it "converts a Z into an Unfoldable" do
-      Life.toUnfoldable planeZ `shouldEqual` zArray
-  describe "zDown" do
-    it "moves the cursor down one" do
-      zDown planeZ `shouldEqual` Just planeZ'
-      zDown planeZr `shouldEqual` Just planeZr'
-    it "inverts zUp" $ checkInverse zDown zUp
-  describe "zUp" do
-    it "moves the cursor up one" do
-      zUp planeZ' `shouldEqual` Just planeZ
-      zUp planeZr' `shouldEqual` Just planeZr
-    it "inverts zDown" $ checkInverse zUp zDown
-  describe "zRight" do
-    it "moves the cursor right one" do
-      zRight planeZ `shouldEqual` Just planeZr
-      zRight planeZ' `shouldEqual` Just planeZr'
-    it "inverts zLeft" $ checkInverse zLeft zRight
-  describe "zLeft" do
-    it "moves the cursor left one" do
-      zLeft planeZr `shouldEqual` Just planeZ
-      zLeft planeZr' `shouldEqual` Just planeZ'
-    it "inverts zRight" $ checkInverse zRight zLeft
-  describe "maybeIterate" do
-    it "iterates but discards the original input" do
-      maybeIterate (\x -> if x >= 8 then Nothing else Just (x*2)) 1 `shouldEqual` [2,4,8]
-  describe "extend" do
-    it "should turn a Z a into a Z (Z a)" do
-      extend id planeZ `shouldEqual` metaPlaneZ'
-    let get = fromMaybe emptyZ
-        arrayZ3 = replicate 3 (replicate 3 0)
-        planeZ3 = get (Life.fromFoldable arrayZ3)
-        metaArrayZ3 = [ [planeZ3, get (zRight planeZ3), get (zRight planeZ3 >>= zRight)]
-                      , [get (zDown planeZ3), get (zDown planeZ3 >>= zRight), get (zDown planeZ3 >>= zRight >>= zRight)]
-                      , [get (zDown planeZ3 >>= zDown), get (zDown planeZ3 >>= zDown >>= zRight), get (zDown planeZ3 >>= zDown >>= zRight >>= zRight)]
-                      ]
-        metaPlaneZ3 = Life.fromFoldable metaArrayZ3
-    it "should turn a 3x3 Z a into a Z (Z a)" do
-      Just (extend id planeZ3) `shouldEqual` metaPlaneZ3
-    it "should return the original plane when combined with extract" do
-      extend extract planeZ `shouldEqual` planeZ
-  comonadLaws
-  let sampleArray = [[false, false, false], [false, true, false], [false, false, false]]
-      sampleArray' = [[1, 1, 1], [1, 0, 1], [1, 1, 1]]
-      sampleBoard = fromMaybe emptyZ (Life.fromFoldable sampleArray)
-      sampleBoard' = fromMaybe emptyZ (Life.fromFoldable sampleArray')
-  describe "neighbors" do
-    it "refers to 8 directions" $
-      length neighbors `shouldEqual` 8
+    it "inverse of toUnfoldable" $
+      quickCheck \(ArbZ z) -> let xs :: Array (Array Boolean)
+                                  xs = Life.toUnfoldable z
+                              in Life.fromFoldable xs === Just z
+  describe "ZipperT" do
+    it "satisfies Eq laws" $
+      liftEff $ checkEq prxArbZipperT
+    it "satisfies Ord laws" $
+      liftEff $ checkOrd prxArbZipperT
+    it "satisfies Functor laws" $
+      liftEff $ checkFunctor prx2arbZipperT
+    it "satisfies comonad laws: extract" $
+      -- extract . extend f  = f
+      liftEff $ checkComonad prx2arbZipperT
+    it "satisfies comonad laws: extend" $
+      liftEff $ checkExtend prx2arbZipperT
+  describe "Z" do
+    it "satisfies Eq laws" $
+      liftEff $ checkEq prxArbZ
+    it "satisfies Ord laws" $
+      liftEff $ checkOrd prxArbZ
+    it "satisfies Functor laws" $
+      liftEff $ checkFunctor prx2arbZ
+    it "satisfies comonad laws: extract" $
+      quickCheck \(ArbZ z :: ArbZ Boolean) -> extend extract z === z
+      -- liftEff $ checkComonad prx2arbZ
+    it "satisfies comonad laws: extend" $
+      liftEff $ checkExtend prx2arbZ
   describe "aliveNeighbors" do
-    it "returns the number of alive neighbors" do
-      extend aliveNeighbors sampleBoard `shouldEqual` sampleBoard'
+    pending "returns the number of alive neighbors"
