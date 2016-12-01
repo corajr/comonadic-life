@@ -30,7 +30,8 @@ instance functorZZ :: Functor ZZ where
     map f (ZZ z) = ZZ (map ((map <<< map) f) z)
 
 instance extendZZ :: Extend ZZ where
-  extend f (ZZ w) = ZZ (extend (map (f <<< ZZ) <<< rotations) w)
+  extend f (ZZ w) = ZZ (extend (extend (extend f')) w)
+    where f' = f <<< ZZ
 
 instance comonadZZ :: Comonad ZZ where
     extract (ZZ z) = extract (extract (extract z))
@@ -46,25 +47,25 @@ emptyZZ :: forall a. (Bounded a) => ZZ a
 emptyZZ = ZZ (zipper (zipper (zipper bottom)))
 
 -- | Neighbors in all 8 directions
-neighbors :: forall a. Array (ZZ a -> ZZ a)
-neighbors = horiz <> vert <> lift2 (>>>) horiz vert <> lift3 (\x y z -> x >>> y >>> z) horiz vert depth
+neighborsZZ :: forall a. Array (ZZ a -> ZZ a)
+neighborsZZ = horiz <> vert <> lift2 (>>>) horiz vert <> lift3 (\x y z -> x >>> y >>> z) horiz vert depth
   where horiz = [zzLeft, zzRight]
         vert = [zzUp, zzDown]
         depth = [zzIn, zzOut]
 
 -- | Boundaries are considered dead.
-aliveNeighbors :: Z Boolean -> Int
-aliveNeighbors z = length <<< filter id $ map (\x -> extract (x z)) neighbors
+aliveNeighborsZZ :: ZZ Boolean -> Int
+aliveNeighborsZZ z = length <<< filter id $ map (\x -> extract (x z)) neighborsZZ
 
-rule :: Z Boolean -> Boolean
-rule z =
-  case aliveNeighbors z of
+ruleZZ :: ZZ Boolean -> Boolean
+ruleZZ z =
+  case aliveNeighborsZZ z of
     2 -> extract z
     3 -> true
     _ -> false
 
-evolve :: ZZ Boolean -> ZZ Boolean
-evolve = extend rule
+evolveZZ :: ZZ Boolean -> ZZ Boolean
+evolveZZ = extend ruleZZ
 
 toUnfoldable :: forall f a. (Unfoldable f, Functor f) => ZZ a -> f (f (f a))
 toUnfoldable (ZZ z) = map (Life.toUnfoldable <<< Z) (toUnfoldableT z)
@@ -73,6 +74,6 @@ fromFoldable :: forall a f. (Traversable f, Foldable f) => f (f (f a)) -> Maybe 
 fromFoldable x = ZZ <$> (traverse fromFoldable' x >>= fromFoldableT)
   where fromFoldable' = map (\(Z z) -> z) <<< Life.fromFoldable
 
-mkZZ :: forall a. (Bounded a) => Array (Array a) -> Z a
+mkZZ :: forall a. (Bounded a) => Array (Array (Array a)) -> ZZ a
 mkZZ = fromMaybe emptyZZ <<< fromFoldable
 

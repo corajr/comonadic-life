@@ -102,7 +102,7 @@ instance functorZ :: Functor Z where
     map f (Z z) = Z (map (map f) z)
 
 instance extendZ :: Extend Z where
-    -- extend :: forall b a. (Z a -> b) -> Z a -> Z b
+  -- extend :: forall b a. (Z a -> b) -> Z a -> Z b
   extend f (Z w) = Z (extend (map (f <<< Z) <<< rotations) w)
 
 instance comonadZ :: Comonad Z where
