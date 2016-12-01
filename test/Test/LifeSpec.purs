@@ -2,28 +2,28 @@ module Test.LifeSpec where
 
 import Prelude
 import Life
+import Data.List as List
+import Data.List.NonEmpty as NE
 import Life as Life
 import Control.Comonad (class Comonad, extract)
 import Control.Extend (class Extend, extend)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Array (length, replicate, toUnfoldable)
 import Data.Identity (Identity(..))
-import Data.List.NonEmpty as NE
-import Data.List.NonEmpty (NonEmptyList)
-import Data.List as List
 import Data.List (List(..))
+import Data.List.NonEmpty (NonEmptyList)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype, wrap, unwrap)
 import Data.NonEmpty ((:|))
 import Test.QuickCheck ((===))
 import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary, class Coarbitrary, coarbitrary)
 import Test.QuickCheck.Gen (chooseInt, listOf, vectorOf)
-import Test.QuickCheck.Laws.Data.Functor (checkFunctor)
-import Test.QuickCheck.Laws.Data.Eq (checkEq)
-import Test.QuickCheck.Laws.Data.Ord (checkOrd)
+import Test.QuickCheck.Laws (A)
 import Test.QuickCheck.Laws.Control.Comonad (checkComonad)
 import Test.QuickCheck.Laws.Control.Extend (checkExtend)
-import Test.QuickCheck.Laws (A)
+import Test.QuickCheck.Laws.Data.Eq (checkEq)
+import Test.QuickCheck.Laws.Data.Functor (checkFunctor)
+import Test.QuickCheck.Laws.Data.Ord (checkOrd)
 import Test.Spec (Spec, describe, it, pending)
 import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.QuickCheck (quickCheck)
@@ -110,6 +110,10 @@ checkInverts a b =
   quickCheck \(NEL (xs :: NonEmptyList Int)) ->
     (b (a xs)) === xs
 
+checkInvertsZ a b =
+  quickCheck \(ArbZ (xs :: Z Int)) ->
+    (b (a xs)) === xs
+
 -- spec :: forall r. Spec r Unit
 spec = do
   let nel1 = NE.singleton 1
@@ -133,18 +137,18 @@ spec = do
       quickCheck \(ArbZ z) -> let xs :: Array (Array Boolean)
                                   xs = Life.toUnfoldable z
                               in Life.fromFoldable xs === Just z
-  describe "ZipperT" do
-    it "satisfies Eq laws" $
-      liftEff $ checkEq prxArbZipperT
-    it "satisfies Ord laws" $
-      liftEff $ checkOrd prxArbZipperT
-    it "satisfies Functor laws" $
-      liftEff $ checkFunctor prx2arbZipperT
-    it "satisfies comonad laws: extract" $
-      -- extract . extend f  = f
-      liftEff $ checkComonad prx2arbZipperT
-    it "satisfies comonad laws: extend" $
-      liftEff $ checkExtend prx2arbZipperT
+  -- describe "ZipperT" do
+  --   it "satisfies Eq laws" $
+  --     liftEff $ checkEq prxArbZipperT
+  --   it "satisfies Ord laws" $
+  --     liftEff $ checkOrd prxArbZipperT
+  --   it "satisfies Functor laws" $
+  --     liftEff $ checkFunctor prx2arbZipperT
+  --   it "satisfies comonad laws: extract" $
+  --     -- extract . extend f  = f
+  --     liftEff $ checkComonad prx2arbZipperT
+  --   it "satisfies comonad laws: extend" $
+  --     liftEff $ checkExtend prx2arbZipperT
   describe "Z" do
     it "satisfies Eq laws" $
       liftEff $ checkEq prxArbZ
@@ -157,5 +161,25 @@ spec = do
       -- liftEff $ checkComonad prx2arbZ
     it "satisfies comonad laws: extend" $
       liftEff $ checkExtend prx2arbZ
+  describe "directions" do
+    let zArray = [[1,2,3], [4, 5, 6], [7,8,9]]
+        mkZ xs = fromMaybe emptyZ (fromFoldable xs)
+        z = mkZ zArray
+    describe "zUp" do
+      it "moves the Z up" $
+        zUp z `shouldEqual` mkZ [[4, 5, 6], [7,8,9], [1,2,3]]
+      it "inverts zDown" $ checkInvertsZ zDown zUp
+    describe "zDown" do
+      it "moves the Z down" $
+        zDown z `shouldEqual` mkZ [[7,8,9], [1,2,3], [4, 5, 6]]
+      it "inverts zUp" $ checkInvertsZ zUp zDown
+    describe "zLeft" do
+      it "moves the Z left" $
+        zLeft z `shouldEqual` mkZ [[2,3,1], [5,6,4], [8,9,7]]
+      it "inverts zRight" $ checkInvertsZ zRight zLeft
+    describe "zRight" do
+      it "moves the Z right" $
+        zRight z `shouldEqual` mkZ [[3,1,2], [6, 4, 5], [9,7,8]]
+      it "inverts zLeft" $ checkInvertsZ zLeft zRight
   describe "aliveNeighbors" do
     pending "returns the number of alive neighbors"

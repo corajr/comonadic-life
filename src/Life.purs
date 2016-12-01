@@ -79,6 +79,11 @@ instance shiftableNEL :: Shiftable NonEmptyList where
       in fromMaybe xs maybeXs
   shift n xs = shiftDefault n xs
 
+instance shiftableZipper :: Shiftable (ZipperT Identity) where
+  up (ZipperT (Identity xs)) = ZipperT (Identity (up xs))
+  down (ZipperT (Identity xs)) = ZipperT (Identity (down xs))
+  shift n xs = shiftDefault n xs
+
 type Zipper a = ZipperT Identity a
 
 newtype Z a = Z (ZipperT Identity (ZipperT Identity a))
@@ -99,7 +104,8 @@ instance functorZ :: Functor Z where
 
 instance extendZ :: Extend Z where
     -- extend :: forall b a. (Z a -> b) -> Z a -> Z b
-    extend f (Z z) = Z (extend (extend (f <<< Z)) z)
+    extend f (Z z) = Z (extend (extend f') z)
+      where f' = f <<< Z
 
 instance comonadZ :: Comonad Z where
     -- extract :: forall a. Z a -> a
@@ -109,6 +115,18 @@ instance comonadZ :: Comonad Z where
 -- neighbors = horiz <> vert <> lift2 (>=>) horiz vert
 --   where horiz = [zLeft, zRight]
 --         vert = [zUp, zDown]
+
+zUp :: forall a. Z a -> Z a
+zUp (Z z) = Z (up z)
+
+zDown :: forall a. Z a -> Z a
+zDown (Z z) = Z (down z)
+
+zLeft :: forall a. Z a -> Z a
+zLeft (Z z) = Z (map up z)
+
+zRight :: forall a. Z a -> Z a
+zRight (Z z) = Z (map down z)
 
 zipper :: forall a. a -> Zipper a
 zipper = wrap <<< wrap <<< NE.singleton
