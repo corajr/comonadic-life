@@ -2,18 +2,16 @@ module Test.LifeSpec where
 
 import Prelude
 import Life
-import Data.List as List
 import Data.List.NonEmpty as NE
 import Life as Life
 import Control.Comonad (class Comonad, extract)
 import Control.Extend (class Extend, extend)
 import Control.Monad.Eff.Class (liftEff)
-import Data.Array (length, replicate, toUnfoldable)
 import Data.Identity (Identity(..))
 import Data.List (List(..))
 import Data.List.NonEmpty (NonEmptyList)
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (class Newtype, wrap, unwrap)
+import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype, wrap)
 import Data.NonEmpty ((:|))
 import Test.QuickCheck ((===))
 import Test.QuickCheck.Arbitrary (class Arbitrary, arbitrary, class Coarbitrary, coarbitrary)
@@ -24,7 +22,7 @@ import Test.QuickCheck.Laws.Control.Extend (checkExtend)
 import Test.QuickCheck.Laws.Data.Eq (checkEq)
 import Test.QuickCheck.Laws.Data.Functor (checkFunctor)
 import Test.QuickCheck.Laws.Data.Ord (checkOrd)
-import Test.Spec (Spec, describe, it, pending)
+import Test.Spec (describe, it)
 import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.QuickCheck (quickCheck)
 import Type.Proxy (Proxy(..), Proxy2(..))
@@ -137,18 +135,17 @@ spec = do
       quickCheck \(ArbZ z) -> let xs :: Array (Array Boolean)
                                   xs = Life.toUnfoldable z
                               in Life.fromFoldable xs === Just z
-  -- describe "ZipperT" do
-  --   it "satisfies Eq laws" $
-  --     liftEff $ checkEq prxArbZipperT
-  --   it "satisfies Ord laws" $
-  --     liftEff $ checkOrd prxArbZipperT
-  --   it "satisfies Functor laws" $
-  --     liftEff $ checkFunctor prx2arbZipperT
-  --   it "satisfies comonad laws: extract" $
-  --     -- extract . extend f  = f
-  --     liftEff $ checkComonad prx2arbZipperT
-  --   it "satisfies comonad laws: extend" $
-  --     liftEff $ checkExtend prx2arbZipperT
+  describe "ZipperT" do
+    it "satisfies Eq laws" $
+      liftEff $ checkEq prxArbZipperT
+    it "satisfies Ord laws" $
+      liftEff $ checkOrd prxArbZipperT
+    it "satisfies Functor laws" $
+      liftEff $ checkFunctor prx2arbZipperT
+    it "satisfies comonad laws: extract" $ do
+      liftEff $ checkComonad prx2arbZipperT
+    it "satisfies comonad laws: extend" $
+      liftEff $ checkExtend prx2arbZipperT
   describe "Z" do
     it "satisfies Eq laws" $
       liftEff $ checkEq prxArbZ
@@ -157,14 +154,11 @@ spec = do
     it "satisfies Functor laws" $
       liftEff $ checkFunctor prx2arbZ
     it "satisfies comonad laws: extract" $
-      quickCheck \(ArbZ z :: ArbZ Boolean) -> extend extract z === z
-      -- liftEff $ checkComonad prx2arbZ
-    it "satisfies comonad laws: extend" $
+      liftEff $ checkComonad prx2arbZ
+    it "satisfies comonad laws: associative extend" $
       liftEff $ checkExtend prx2arbZ
   describe "directions" do
-    let zArray = [[1,2,3], [4, 5, 6], [7,8,9]]
-        mkZ xs = fromMaybe emptyZ (fromFoldable xs)
-        z = mkZ zArray
+    let z = mkZ [[1,2,3], [4, 5, 6], [7,8,9]]
     describe "zUp" do
       it "moves the Z up" $
         zUp z `shouldEqual` mkZ [[4, 5, 6], [7,8,9], [1,2,3]]
@@ -181,5 +175,11 @@ spec = do
       it "moves the Z right" $
         zRight z `shouldEqual` mkZ [[3,1,2], [6, 4, 5], [9,7,8]]
       it "inverts zLeft" $ checkInvertsZ zLeft zRight
+
+  let z = mkZ [[false, false, false], [false, true, false], [false, false, false]]
   describe "aliveNeighbors" do
-    pending "returns the number of alive neighbors"
+    it "returns the number of alive neighbors" $
+      Life.toUnfoldable (extend aliveNeighbors z) `shouldEqual` [[1,1,1], [1,0,1], [1,1,1]]
+  describe "evolve" do
+    it "advances the game of life" $
+      evolve z `shouldEqual` mkZ [[false, false, false], [false, false, false], [false, false, false]]

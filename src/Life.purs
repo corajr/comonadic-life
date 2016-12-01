@@ -14,20 +14,20 @@ import Data.Bounded (class Bounded, bottom)
 import Data.Foldable (class Foldable)
 import Data.Identity (Identity(..))
 import Data.List (List(..), snoc, last, init, (..))
-import Data.List.NonEmpty (NonEmptyList(..))
-import Data.Maybe (Maybe(..), fromMaybe, maybe')
-import Data.Newtype (class Newtype, wrap, unwrap)
+import Data.List.NonEmpty (NonEmptyList)
+import Data.Maybe (Maybe, fromMaybe)
+import Data.Newtype (class Newtype, wrap)
 import Data.NonEmpty ((:|))
 import Data.String (joinWith, fromCharArray)
 import Data.Traversable (class Traversable, traverse)
-import Data.Tuple (Tuple(Tuple))
-import Data.Unfoldable (class Unfoldable, unfoldr, replicate)
-import Partial.Unsafe (unsafeCrashWith)
+import Data.Unfoldable (class Unfoldable, replicate)
 
-class Shiftable t where
+class (Functor t) <= Shiftable t where
   up :: forall a. t a -> t a
   down :: forall a. t a -> t a
   shift :: forall a. Int -> t a -> t a
+  sLength :: forall a. t a -> Int
+  sRange :: Int -> t Int
 
 shiftDefault :: forall t a. (Shiftable t) => Int -> t a -> t a
 shiftDefault 0 xs = xs
@@ -48,16 +48,11 @@ instance functorZipperT :: (Functor w) => Functor (ZipperT w) where
 
 instance extendZipperT :: (Comonad w) => Extend (ZipperT w) where
   -- extend :: forall a b. (ZipperT w a -> b) -> ZipperT w a -> ZipperT w b
-  -- extend :: forall a b. (w (NonEmptyList a) -> b) -> w (NonEmptyList a) -> w (NonEmptyList b)
-  extend f (ZipperT w) = ZipperT (extend go w)
-    where f' = f <<< ZipperT
-          go wz = map f' (rotations wz)
+  extend f (ZipperT w) = ZipperT (extend (map (f <<< ZipperT) <<< rotations) w)
 
-rotations :: forall w a. (Comonad w) => w (NonEmptyList a) -> NonEmptyList (w (NonEmptyList a))
-rotations wz = map (\i -> map (shift i) wz) n_range
-  where n_range = wrap (0 :| n_range')
-        n_range' = if n > 1 then (1 .. (n - 1)) else Nil
-        n = NE.length (extract wz)
+rotations :: forall w t a. (Comonad w, Shiftable t) => w (t a) -> t (w (t a))
+rotations wz = map (\i -> map (shift i) wz) (sRange n)
+  where n = sLength (extract wz)
 
 instance comonadZipperT :: (Comonad w) => Comonad (ZipperT w) where
   extract (ZipperT w) = extract (extract w)
@@ -78,11 +73,15 @@ instance shiftableNEL :: Shiftable NonEmptyList where
                        pure (wrap (x :| (Cons head xs')))
       in fromMaybe xs maybeXs
   shift n xs = shiftDefault n xs
+  sLength xs = NE.length xs
+  sRange n = wrap (0 :|  if n > 1 then (1 .. (n - 1)) else Nil)
 
 instance shiftableZipper :: Shiftable (ZipperT Identity) where
   up (ZipperT (Identity xs)) = ZipperT (Identity (up xs))
   down (ZipperT (Identity xs)) = ZipperT (Identity (down xs))
   shift n xs = shiftDefault n xs
+  sLength (ZipperT (Identity xs)) = NE.length xs
+  sRange n = ZipperT (Identity (sRange n))
 
 type Zipper a = ZipperT Identity a
 
@@ -104,17 +103,11 @@ instance functorZ :: Functor Z where
 
 instance extendZ :: Extend Z where
     -- extend :: forall b a. (Z a -> b) -> Z a -> Z b
-    extend f (Z z) = Z (extend (extend f') z)
-      where f' = f <<< Z
+  extend f (Z w) = Z (extend (map (f <<< Z) <<< rotations) w)
 
 instance comonadZ :: Comonad Z where
     -- extract :: forall a. Z a -> a
     extract (Z z) = extract (extract z)
-
--- neighbors :: forall a. Array (Z a -> Maybe (Z a))
--- neighbors = horiz <> vert <> lift2 (>=>) horiz vert
---   where horiz = [zLeft, zRight]
---         vert = [zUp, zDown]
 
 zUp :: forall a. Z a -> Z a
 zUp (Z z) = Z (up z)
@@ -134,18 +127,20 @@ zipper = wrap <<< wrap <<< NE.singleton
 emptyZ :: forall a. (Bounded a) => Z a
 emptyZ = Z (zipper (zipper bottom))
 
+-- | Neighbors in all 8 directions
+neighbors :: forall a. Array (Z a -> Z a)
+neighbors = horiz <> vert <> lift2 (>>>) horiz vert
+  where horiz = [zLeft, zRight]
+        vert = [zUp, zDown]
+
 -- | Boundaries are considered dead.
 aliveNeighbors :: Z Boolean -> Int
-aliveNeighbors _ = 0
--- aliveNeighbors z = length <<< filter id $ map fetch neighbors
---   where fetch dir = case dir z of
---           Just z' -> extract z'
---           Nothing -> false
+aliveNeighbors z = length <<< filter id $ map (\x -> extract (x z)) neighbors
 
 rule :: Z Boolean -> Boolean
 rule z =
   case aliveNeighbors z of
-    2 -> false --extract z
+    2 -> extract z
     3 -> true
     _ -> false
 
@@ -182,3 +177,6 @@ toUnfoldable (Z z) = map toUnfoldableT (toUnfoldableT z)
 
 fromFoldable :: forall a f. (Traversable f, Foldable f) => f (f a) -> Maybe (Z a)
 fromFoldable x = Z <$> (traverse fromFoldableT x >>= fromFoldableT)
+
+mkZ :: forall a. (Bounded a) => Array (Array a) -> Z a
+mkZ = fromMaybe emptyZ <<< fromFoldable
