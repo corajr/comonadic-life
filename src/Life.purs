@@ -96,7 +96,7 @@ zipper :: forall a. a -> ZipperT Identity a
 zipper = wrap <<< wrap <<< NE.singleton
 
 emptyZ :: forall a. (Bounded a) => Z a
-emptyZ = ZipperT (zipper (NE.singleton bottom))
+emptyZ = ZipperT (ZipperT (Identity (NE.singleton (NE.singleton bottom))))
 
 -- | Neighbors in all 8 directions
 neighbors :: forall a. Array (Z a -> Z a)

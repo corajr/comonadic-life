@@ -12,9 +12,6 @@ import Jack.Runner (jackMain)
 
 -- main :: Eff (fs :: FS, process :: PROCESS, console :: CONSOLE) Unit
 main = do
-  -- jackMain [
-  --   "Test.LifeComonadLaws"
-  -- ]
   discover "Test\\..*Spec" >>= run [consoleReporter]
 
 

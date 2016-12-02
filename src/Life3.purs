@@ -1,55 +1,47 @@
 module Life3 where
 
 import Prelude
-import Life
+import Life (ZipperT(..), up, down)
 import Life as Life
 import Control.Apply (lift2, lift3)
-import Control.Comonad (class Comonad, extract)
-import Control.Comonad.Trans.Class (class ComonadTrans, lower)
-import Control.Extend (class Extend, extend)
+import Control.Comonad (extract)
+import Control.Extend (extend)
 import Data.Array (filter, length)
 import Data.Foldable (class Foldable)
-import Data.Identity (Identity)
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (class Newtype, unwrap)
+import Data.Identity (Identity(..))
+import Data.List.NonEmpty as NE
+import Data.Maybe (Maybe, fromMaybe)
 import Data.Traversable (class Traversable, traverse)
-import Data.Unfoldable (class Unfoldable, replicate)
+import Data.Unfoldable (class Unfoldable)
 
-newtype ZZ a = ZZ (ZipperT Identity (ZipperT Identity (ZipperT Identity a)))
+type ZZ a = ZipperT (ZipperT (ZipperT Identity)) a
 
-derive instance newtypeZZ :: Newtype (ZZ a) _
-derive newtype instance eqZZ :: (Eq a) => Eq (ZZ a)
-derive newtype instance ordZZ :: (Ord a) => Ord (ZZ a)
+zzUp :: forall a. ZZ a -> ZZ a
+zzUp (ZipperT z) = ZipperT (map up z)
 
-instance showZZ :: (Show a) => Show (ZZ a) where
-  show z = show z'
-    where z' :: Array (Array (Array a))
-          z' = toUnfoldable z
+zzDown :: forall a. ZZ a -> ZZ a
+zzDown (ZipperT z) = ZipperT (map down z)
 
-instance functorZZ :: Functor ZZ where
-    map f (ZZ z) = ZZ (map (map (map f)) z)
+zzLeft :: forall a. ZZ a -> ZZ a
+zzLeft (ZipperT z) = ZipperT (up z)
 
-instance extendZZ :: Extend ZZ where
-  extend f (ZZ zz) = ZZ (extend (map (extend f' <<< rotations)) zz)
-    where f' = f <<< ZZ
-  -- extend f (ZZ w) = ZZ (map (f <<< ZZ) (rotations (rotations (rotations w))))
+zzRight :: forall a. ZZ a -> ZZ a
+zzRight (ZipperT z) = ZipperT (down z)
 
-instance comonadZZ :: Comonad ZZ where
-    extract (ZZ z) = extract (extract (extract z))
+zzIn :: forall a. ZZ a -> ZZ a
+zzIn z = up z
 
-zzUp (ZZ z) = ZZ (up z)
-zzDown (ZZ z) = ZZ (down z)
-zzLeft (ZZ z) = ZZ (map up z)
-zzRight (ZZ z) = ZZ (map down z)
-zzIn (ZZ z) = ZZ (map (map up) z)
-zzOut (ZZ z) = ZZ (map (map down) z)
+zzOut :: forall a. ZZ a -> ZZ a
+zzOut z = down z
 
 emptyZZ :: forall a. (Bounded a) => ZZ a
-emptyZZ = ZZ (zipper (zipper (zipper bottom)))
+emptyZZ = ZipperT (ZipperT (ZipperT (Identity (NE.singleton (NE.singleton (NE.singleton bottom))))))
 
--- | Neighbors in all 8 directions
+-- | Neighbors in all 26 directions
 neighborsZZ :: forall a. Array (ZZ a -> ZZ a)
-neighborsZZ = horiz <> vert <> lift2 (>>>) horiz vert <> lift3 (\x y z -> x >>> y >>> z) horiz vert depth
+neighborsZZ = horiz <> vert <> depth <>
+              lift2 (>>>) horiz vert <> lift2 (>>>) vert depth <> lift2 (>>>) horiz depth <>
+              lift3 (\x y z -> x >>> y >>> z) horiz vert depth
   where horiz = [zzLeft, zzRight]
         vert = [zzUp, zzDown]
         depth = [zzIn, zzOut]
@@ -61,20 +53,18 @@ aliveNeighborsZZ z = length <<< filter id $ map (\x -> extract (x z)) neighborsZ
 ruleZZ :: ZZ Boolean -> Boolean
 ruleZZ z =
   case aliveNeighborsZZ z of
-    2 -> extract z
-    3 -> true
+    4 -> extract z
+    5 -> true
     _ -> false
 
 evolveZZ :: ZZ Boolean -> ZZ Boolean
 evolveZZ = extend ruleZZ
 
 toUnfoldable :: forall f a. (Unfoldable f, Functor f) => ZZ a -> f (f (f a))
-toUnfoldable (ZZ z) = map (Life.toUnfoldable <<< Z) (toUnfoldableT z)
+toUnfoldable (ZipperT z) = Life.toUnfoldable (map NE.toUnfoldable z)
 
 fromFoldable :: forall a f. (Traversable f, Foldable f) => f (f (f a)) -> Maybe (ZZ a)
-fromFoldable x = ZZ <$> (traverse fromFoldable' x >>= fromFoldableT)
-  where fromFoldable' = map (\(Z z) -> z) <<< Life.fromFoldable
+fromFoldable x = ZipperT <$> (traverse (traverse NE.fromFoldable) x >>= Life.fromFoldable)
 
 mkZZ :: forall a. (Bounded a) => Array (Array (Array a)) -> ZZ a
 mkZZ = fromMaybe emptyZZ <<< fromFoldable
-
