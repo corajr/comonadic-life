@@ -56,7 +56,7 @@ instance extendArbZipperT :: Extend ArbZipperT where
 instance comonadArbZipperT :: Comonad ArbZipperT where
   extract (ArbZipperT z) = extract z
 
-newtype ArbZ a = ArbZ (Z a)
+newtype ArbZ a = ArbZ (ZipperT (ZipperT Identity) a)
 
 derive instance newtypeArbZ :: Newtype (ArbZ a) _
 
